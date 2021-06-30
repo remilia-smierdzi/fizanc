@@ -5,9 +5,11 @@
 #include <stdbool.h>
 #include <time.h>
 
+#define WALL_VALUE 10000
 #define ARRAY_SIZE 1000
 #define PROPAGATION_SIZE 5000
-
+#define BETA .2
+/* beta=stupidity factor */
 struct point{
 	int x;
 	int y;
@@ -22,6 +24,7 @@ struct person{
 
 void propagate(int x,int y);
 void pmove(struct person *p);
+void pmoverand(struct person *p);
 bool onexit(int x,int y);
 void pshuf();
 
@@ -57,7 +60,7 @@ int main(int argc,char *argv[]){
 				cls[crow++][cline].value = 0;
 				break;
 			case '#':
-				cls[crow++][cline].value = 10000;
+				cls[crow++][cline].value = WALL_VALUE;
 				break;
 			case '\n':
 				if (crow>mrow) mrow=crow;
@@ -85,7 +88,6 @@ int main(int argc,char *argv[]){
 		printf("bad f format");
 		return 1;
 	}
-	printf("fread ok.");
 	for (int i=0;i<cprop;i++){
 		exits[i]=qprop[i];
 	}
@@ -95,16 +97,16 @@ int main(int argc,char *argv[]){
 	for (int i=0;i<ippl;i++){
 		ppl[i].in=TRUE;
 	}
-	printf("initing nc.");
 	initscr();
 	noecho();
 	curs_set(0);
+	/* propagate floor field values */
 	while(cprop){
 		for (int i=0;i<cprop;i++){
 			propagate(qprop[i].x,qprop[i].y);
 			// for (int iy=0;iy<cline+1;iy++){
 			// 	for (int ix=0;ix<mrow;ix++){
-			// 		if (cls[ix][iy].value==10000)
+			// 		if (cls[ix][iy].value==WALL_VALUE)
 			// 			mvprintw(iy*2, ix*5,"#");
 			// 		else if (cls[ix][iy].value!=0){
 			// 			mvprintw(iy*2, ix*5, "%2.1f",cls[ix][iy].value);
@@ -128,96 +130,113 @@ int main(int argc,char *argv[]){
 		nqprop=temp;
 	}
 	refresh();
+	/* draw walls and fill empty space with spaces */
 	for (int iy=0;iy<cline+1;iy++){
 		for (int ix=0;ix<mrow;ix++){
-			mvaddch(iy,ix,cls[ix][iy].value==10000 ? '#' : ' ');
-			// mvprintw(iy, ix*5, "%2.1f",cls[ix][iy].value==10000 ? 9.9 : cls[ix][iy].value);
-			//mvaddch(iy, ix, cls[ix][iy].value==10000 ? '#' : ' ');
+			mvaddch(iy,ix,cls[ix][iy].value==WALL_VALUE ? '#' : ' ');
+			// mvprintw(iy, ix*5, "%2.1f",cls[ix][iy].value==WALL_VALUE ? 9.9 : cls[ix][iy].value);
+			// mvaddch(iy, ix, cls[ix][iy].value==WALL_VALUE ? '#' : ' ');
 		}
 	}
+	/* draw people */
 	for (int i=0;i<ippl;i++){
 		mvaddch(ppl[i].pos.y, ppl[i].pos.x,'p');
 	}
+	/* draw exits */
 	for (int i=0;i<cexits;i++){
 		mvaddch(exits[i].y, exits[i].x,'e');
 	}
-	refresh();
-	getch();
+	/* simulation loop */
 	while (true){
-		pshuf();
+		refresh();
 		if (exited==ippl) break;
+		getch();
+		// usleep(250000);
+		pshuf();
+		/* move and draw people */
 		for (int i=0;i<ippl;i++){
 			if(ppl[i].in){
 				mvaddch(ppl[i].pos.y,ppl[i].pos.x,' ');
-				pmove(&ppl[i]);
-				if (onexit(ppl[i].pos.x,ppl[i].pos.y)){
-					exited++;
-					ppl[i].in=FALSE;
+				/* beta-based randomization here */
+				if ((float)rand()/(float)RAND_MAX>BETA){
+					pmove(&ppl[i]);
 				}else{
-					mvaddch(ppl[i].pos.y,ppl[i].pos.x,'p');
+					pmoverand(&ppl[i]);
 				}
+				mvaddch(ppl[i].pos.y,ppl[i].pos.x,'p');
 			}
 		}
-		refresh();
-		getch();
-		// usleep(250000);
+		/* remove people standing on exits */
+		for (int i=0;i<ippl;i++){
+			if (ppl[i].in && onexit(ppl[i].pos.x,ppl[i].pos.y)){
+				exited++;
+				ppl[i].in=FALSE;
+			}
+		}
+		/* redraw all exits */
+		for (int i=0;i<cexits;i++){
+			mvaddch(exits[i].y, exits[i].x,'e');
+		}
+		mvprintw(getmaxy(stdscr)-1, 0, "%d/%d",exited,ippl);
 	}
 	getch();
 	endwin();
 }
 
+/* propagate floor values to tiles adjacent to this xy */
 void propagate(int x,int y){
 	if(cls[x-1][y].value==0){
 		cls[x-1][y].value = cls[x][y].value+1;
-		//mvprintw(y, (x-1)*5, "%2.1f",cls[x-1][y].value==10000 ? 9.9 : cls[x-1][y].value);
+		//mvprintw(y, (x-1)*5, "%2.1f",cls[x-1][y].value==WALL_VALUE ? 9.9 : cls[x-1][y].value);
 		nqprop[ncprop].x = x-1;
 		nqprop[ncprop++].y = y;
 	}
 	if(cls[x][y-1].value==0){
 		cls[x][y-1].value = cls[x][y].value+1;
-		//mvprintw(y-1, x*5, "%2.1f",cls[x][y-1].value==10000 ? 9.9 : cls[x][y-1].value);
+		//mvprintw(y-1, x*5, "%2.1f",cls[x][y-1].value==WALL_VALUE ? 9.9 : cls[x][y-1].value);
 		nqprop[ncprop].x = x;
 		nqprop[ncprop++].y = y-1;
 	}
 	if(cls[x+1][y].value==0){
 		cls[x+1][y].value = cls[x][y].value+1;
-		//mvprintw(y, (x+1)*5, "%2.1f",cls[x+1][y].value==10000 ? 9.9 : cls[x+1][y].value);
+		//mvprintw(y, (x+1)*5, "%2.1f",cls[x+1][y].value==WALL_VALUE ? 9.9 : cls[x+1][y].value);
 		nqprop[ncprop].x = x+1;
 		nqprop[ncprop++].y = y;
 	}
 	if(cls[x][y+1].value==0){
 		cls[x][y+1].value = cls[x][y].value+1;
-		//mvprintw(y+1, x*5, "%2.1f",cls[x][y+1].value==10000 ? 9.9 : cls[x][y+1].value);
+		//mvprintw(y+1, x*5, "%2.1f",cls[x][y+1].value==WALL_VALUE ? 9.9 : cls[x][y+1].value);
 		nqprop[ncprop].x = x;
 		nqprop[ncprop++].y = y+1;
 	}
 
 	if(cls[x-1][y-1].value==0){
 		cls[x-1][y-1].value = cls[x][y].value+1.5;
-		//mvprintw(y-1, (x-1)*5, "%2.1f",cls[x-1][y-1].value==10000 ? 9.9 : cls[x-1][y-1].value);
+		//mvprintw(y-1, (x-1)*5, "%2.1f",cls[x-1][y-1].value==WALL_VALUE ? 9.9 : cls[x-1][y-1].value);
 		nqprop[ncprop].x = x-1;
 		nqprop[ncprop++].y = y-1;
 	}
 	if(cls[x+1][y-1].value==0){
 		cls[x+1][y-1].value = cls[x][y].value+1.5;
-		//mvprintw(y-1, (x+1)*5, "%2.1f",cls[x+1][y-1].value==10000 ? 9.9 : cls[x+1][y-1].value);
+		//mvprintw(y-1, (x+1)*5, "%2.1f",cls[x+1][y-1].value==WALL_VALUE ? 9.9 : cls[x+1][y-1].value);
 		nqprop[ncprop].x = x+1;
 		nqprop[ncprop++].y = y-1;
 	}
 	if(cls[x+1][y+1].value==0){
 		cls[x+1][y+1].value = cls[x][y].value+1.5;
-		//mvprintw(y+1, (x+1)*5, "%2.1f",cls[x+1][y+1].value==10000 ? 9.9 : cls[x+1][y+1].value);
+		//mvprintw(y+1, (x+1)*5, "%2.1f",cls[x+1][y+1].value==WALL_VALUE ? 9.9 : cls[x+1][y+1].value);
 		nqprop[ncprop].x = x+1;
 		nqprop[ncprop++].y = y+1;
 	}
 	if(cls[x-1][y+1].value==0){
 		cls[x-1][y+1].value = cls[x][y].value+1.5;
-		//mvprintw(y+1, (x-1)*5, "%2.1f",cls[x-1][y+1].value==10000 ? 9.9 : cls[x-1][y+1].value);
+		//mvprintw(y+1, (x-1)*5, "%2.1f",cls[x-1][y+1].value==WALL_VALUE ? 9.9 : cls[x-1][y+1].value);
 		nqprop[ncprop].x = x-1;
 		nqprop[ncprop++].y = y+1;
 	}
 }
 
+/* how many people on xy */
 int pon(int x,int y){
 	int many=0;
 	for (int i=0;i<ippl;i++){
@@ -227,6 +246,7 @@ int pon(int x,int y){
 	return many;
 }
 
+/* one check of moving the person */
 void smove(int x,int y,float *low,struct point *c){
 	if (cls[x][y].value<*low && !pon(x,y)){
 		*low=cls[x][y].value;
@@ -234,7 +254,7 @@ void smove(int x,int y,float *low,struct point *c){
 		c->y=y;
 	}
 }
-
+/* logically simulation step a person */
 void pmove(struct person *p){
 	struct point clow = {p->pos.x,p->pos.y};
 	float low = cls[clow.x][clow.y].value;
@@ -253,6 +273,36 @@ void pmove(struct person *p){
 	p->pos.y=clow.y;
 }
 
+/* one check of randomly moving a person */
+void smoverand(int x,int y,struct point list[], unsigned int *clist){
+	if (cls[x][y].value<WALL_VALUE && !pon(x,y)){
+		list[*clist].y=y;
+		list[(*clist)++].x=x;
+	}
+}
+/* randomly simulation step a person */
+void pmoverand(struct person *p){
+	struct point avail[8];
+	unsigned int cavail=0;
+
+	smoverand(p->pos.x-1,p->pos.y,avail,&cavail);
+	smoverand(p->pos.x,p->pos.y-1,avail,&cavail);
+	smoverand(p->pos.x+1,p->pos.y,avail,&cavail);
+	smoverand(p->pos.x,p->pos.y+1,avail,&cavail);
+
+	smoverand(p->pos.x-1,p->pos.y-1,avail,&cavail);
+	smoverand(p->pos.x+1,p->pos.y-1,avail,&cavail);
+	smoverand(p->pos.x+1,p->pos.y+1,avail,&cavail);
+	smoverand(p->pos.x-1,p->pos.y+1,avail,&cavail);
+
+	if (cavail>0){
+		unsigned int randind=rand()%cavail;
+		p->pos.x=avail[randind].x;
+		p->pos.y=avail[randind].y;
+	}
+}
+
+/* are these xy on an exit */
 bool onexit(int x,int y){
 	for(int i=0;i<cexits;i++){
 		if(x==exits[i].x && y==exits[i].y)
@@ -261,6 +311,7 @@ bool onexit(int x,int y){
 	return FALSE;
 }
 
+/* shuffle people */
 void pshuf(){
 	struct person t;
 	for (int i=0;i<ippl;i++){
