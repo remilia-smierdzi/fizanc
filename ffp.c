@@ -8,8 +8,8 @@
 #define WALL_VALUE 10000
 #define ARRAY_SIZE 1000
 #define PROPAGATION_SIZE 5000
-#define BETA .2
-/* beta=stupidity factor */
+#define BETA 0
+/* beta=antisociality factor */
 struct point{
 	int x;
 	int y;
@@ -27,6 +27,7 @@ void pmove(struct person *p);
 void pmoveesc(struct person *p);
 bool onexit(int x,int y);
 void pshuf();
+bool paround(int x,int y);
 
 struct cell cls[ARRAY_SIZE][ARRAY_SIZE];
 struct person ppl[ARRAY_SIZE];
@@ -43,6 +44,7 @@ unsigned int ncprop=0;
 unsigned int exited=0;
 struct point exits[ARRAY_SIZE];
 unsigned int cexits;
+unsigned int counter=0;
 
 int main(int argc,char *argv[]){
 	if (argc!=2){
@@ -146,6 +148,7 @@ int main(int argc,char *argv[]){
 	for (int i=0;i<cexits;i++){
 		mvaddch(exits[i].y, exits[i].x,'e');
 	}
+  mvprintw(getmaxy(stdscr)-3,0,"any key progresses the simulation once");
 	/* simulation loop */
 	while (true){
 		refresh();
@@ -157,12 +160,18 @@ int main(int argc,char *argv[]){
 		for (int i=0;i<ippl;i++){
 			if(ppl[i].in){
 				mvaddch(ppl[i].pos.y,ppl[i].pos.x,' ');
-				/* beta-based randomization here */
-				if ((float)rand()/(float)RAND_MAX>BETA){
-					pmove(&ppl[i]);
-				}else{
-					pmoveesc(&ppl[i]);
-				}
+        /* when people around */
+        if(paround(ppl[i].pos.x,ppl[i].pos.y)){
+          /* beta-based randomization here */
+				  if ((float)rand()/(float)RAND_MAX>BETA){
+					  pmove(&ppl[i]);
+				  }else{
+					  pmoveesc(&ppl[i]);
+				  }
+        /* when no people around */
+        } else {
+          pmove(&ppl[i]);
+        }
 				mvaddch(ppl[i].pos.y,ppl[i].pos.x,'p');
 			}
 		}
@@ -177,9 +186,13 @@ int main(int argc,char *argv[]){
 		for (int i=0;i<cexits;i++){
 			mvaddch(exits[i].y, exits[i].x,'e');
 		}
+    mvprintw(getmaxy(stdscr)-2,0,"steps done:%d",++counter);
 		mvprintw(getmaxy(stdscr)-1, 0, "%d/%d",exited,ippl);
 	}
-	getch();
+  mvprintw(getmaxy(stdscr)-3,0,"\n");
+  mvprintw(getmaxy(stdscr)-3,0,"press q to exit");
+  mvprintw(getmaxy(stdscr)-2,0,"simulation completed in %d",counter++);
+	while((c=getch())!='q');
 	endwin();
 }
 
@@ -244,6 +257,35 @@ bool pon(int x,int y){
 	}
 	return false;
 }
+/* are there people around xy */
+bool paround(int x,int y){
+  if (pon(x-1,y)) return true;
+  if (pon(x,y-1)) return true;
+  if (pon(x+1,y)) return true;
+  if (pon(x,y+1)) return true;
+
+  if (pon(x-1,y-1)) return true;
+  if (pon(x+1,y-1)) return true;
+  if (pon(x+1,y+1)) return true;
+  if (pon(x-1,y+1)) return true;
+  
+	return false;
+}
+/* are there people around xy */
+unsigned int paroundc(int x,int y){
+  unsigned int many=0;
+  if (pon(x-1,y)) many++;
+  if (pon(x,y-1)) many++;
+  if (pon(x+1,y)) many++;
+  if (pon(x,y+1)) many++;
+
+  if (pon(x-1,y-1)) many++;
+  if (pon(x+1,y-1)) many++;
+  if (pon(x+1,y+1)) many++;
+  if (pon(x-1,y+1)) many++;
+  
+	return many;
+}
 
 /* one check of logically moving the person */
 void smove(int x,int y,float *low,struct point *c){
@@ -273,32 +315,30 @@ void pmove(struct person *p){
 }
 
 /* one check of moving a person away from other people */
-void smoveesc(int x,int y,struct point list[], unsigned int *clist){
-	if (cls[x][y].value<WALL_VALUE && !pon(x,y)){
-		list[*clist].y=y;
-		list[(*clist)++].x=x;
+void smoveesc(int x,int y,unsigned int *low,struct point *c){
+	if (cls[x][y].value<WALL_VALUE && !pon(x,y) && paround(x,y)<*low){
+		*low=cls[x][y].value;
+		c->x=x;
+		c->y=y;
 	}
 }
 /* antisocially simulation step a person */
 void pmoveesc(struct person *p){
-	struct point avail[8];
-	unsigned int cavail=0;
+	struct point clow = {p->pos.x,p->pos.y};
+	unsigned int low = paroundc(p->pos.x,p->pos.y);
 
-	smoveesc(p->pos.x-1,p->pos.y,avail,&cavail);
-	smoveesc(p->pos.x,p->pos.y-1,avail,&cavail);
-	smoveesc(p->pos.x+1,p->pos.y,avail,&cavail);
-	smoveesc(p->pos.x,p->pos.y+1,avail,&cavail);
+	smoveesc(p->pos.x-1,p->pos.y,&low,&clow);
+	smoveesc(p->pos.x,p->pos.y-1,&low,&clow);
+	smoveesc(p->pos.x+1,p->pos.y,&low,&clow);
+	smoveesc(p->pos.x,p->pos.y+1,&low,&clow);
 
-	smoveesc(p->pos.x-1,p->pos.y-1,avail,&cavail);
-	smoveesc(p->pos.x+1,p->pos.y-1,avail,&cavail);
-	smoveesc(p->pos.x+1,p->pos.y+1,avail,&cavail);
-	smoveesc(p->pos.x-1,p->pos.y+1,avail,&cavail);
+	smoveesc(p->pos.x-1,p->pos.y-1,&low,&clow);
+	smoveesc(p->pos.x+1,p->pos.y-1,&low,&clow);
+	smoveesc(p->pos.x+1,p->pos.y+1,&low,&clow);
+	smoveesc(p->pos.x-1,p->pos.y+1,&low,&clow);
 
-	if (cavail>0){
-		unsigned int randind=rand()%cavail;
-		p->pos.x=avail[randind].x;
-		p->pos.y=avail[randind].y;
-	}
+	p->pos.x=clow.x;
+	p->pos.y=clow.y;
 }
 
 /* are these xy on an exit */
