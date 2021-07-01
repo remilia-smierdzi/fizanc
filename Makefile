@@ -1,5 +1,10 @@
 CC=gcc
 LDFLAGS=-lncurses
 
-main: main.c
-	$(CC) main.c $(LDFLAGS) -o main
+all: ffrm ffp
+
+ffrm: ffrm.c
+	$(CC) ffrm.c $(LDFLAGS) -o ffrm
+
+ffp: ffp.c
+	$(CC) ffp.c $(LDFLAGS) -o ffp
