@@ -146,6 +146,7 @@ int main(int argc,char *argv[]){
 	for (int i=0;i<cexits;i++){
 		mvaddch(exits[i].y, exits[i].x,'e');
 	}
+	mvprintw(getmaxy(stdscr)-3,0,"any key progresses the simulation once");
 	/* simulation loop */
 	while (true){
 		refresh();
@@ -177,9 +178,13 @@ int main(int argc,char *argv[]){
 		for (int i=0;i<cexits;i++){
 			mvaddch(exits[i].y, exits[i].x,'e');
 		}
+		mvprintw(getmaxy(stdscr)-2,0,"steps done:%d",++counter);
 		mvprintw(getmaxy(stdscr)-1, 0, "%d/%d",exited,ippl);
 	}
-	getch();
+	mvprintw(getmaxy(stdscr)-3,0,"\n");
+  mvprintw(getmaxy(stdscr)-3,0,"press q to exit");
+  mvprintw(getmaxy(stdscr)-2,0,"simulation completed in %d",counter++);
+	while((c=getch())!='q');
 	endwin();
 }
 
