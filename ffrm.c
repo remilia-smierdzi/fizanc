@@ -52,7 +52,7 @@ int main(int argc,char *argv[]){
 	FILE *f;
 	f = fopen(argv[1], "r");
 	if (!f) return 1;
-	char c;
+	int c;
 	int cline=0,crow=0,mrow=0;
 	while((c=getc(f))!=EOF){
 		switch (c) {
