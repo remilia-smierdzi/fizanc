@@ -51,6 +51,15 @@ int main(int argc,char *argv[]){
 		printf("usage: only arg is the filename of simulation template\n");
 		return 2;
 	}
+	
+	
+	initscr();
+	start_color();			/* Start color 			*/
+	init_pair(1, COLOR_GREEN, COLOR_BLACK);
+	init_pair(2, COLOR_RED, COLOR_BLACK);
+	
+	
+	
 	FILE *f;
 	f = fopen(argv[1], "r");
 	if (!f) return 1;
@@ -142,11 +151,15 @@ int main(int argc,char *argv[]){
 	}
 	/* draw people */
 	for (int i=0;i<ippl;i++){
+		attron(COLOR_PAIR(2));
 		mvaddch(ppl[i].pos.y, ppl[i].pos.x,'p');
+		attroff(COLOR_PAIR(2));
 	}
 	/* draw exits */
 	for (int i=0;i<cexits;i++){
+		attron(COLOR_PAIR(1));
 		mvaddch(exits[i].y, exits[i].x,'e');
+		attroff(COLOR_PAIR(1));
 	}
   mvprintw(getmaxy(stdscr)-3,0,"any key progresses the simulation once");
 	/* simulation loop */
@@ -159,7 +172,9 @@ int main(int argc,char *argv[]){
 		/* move and draw people */
 		for (int i=0;i<ippl;i++){
 			if(ppl[i].in){
+				attron(COLOR_PAIR(2));
 				mvaddch(ppl[i].pos.y,ppl[i].pos.x,' ');
+				attroff(COLOR_PAIR(2));
         /* when people around */
         if(paround(ppl[i].pos.x,ppl[i].pos.y)){
           /* beta-based randomization here */
@@ -171,8 +186,9 @@ int main(int argc,char *argv[]){
         /* when no people around */
         } else {
           pmove(&ppl[i]);
-        }
+        }		attron(COLOR_PAIR(2));
 				mvaddch(ppl[i].pos.y,ppl[i].pos.x,'p');
+				attroff(COLOR_PAIR(2));
 			}
 		}
 		/* remove people standing on exits */
@@ -184,7 +200,9 @@ int main(int argc,char *argv[]){
 		}
 		/* redraw all exits */
 		for (int i=0;i<cexits;i++){
+			attron(COLOR_PAIR(1));
 			mvaddch(exits[i].y, exits[i].x,'e');
+			attroff(COLOR_PAIR(1));
 		}
     mvprintw(getmaxy(stdscr)-2,0,"steps done:%d",++counter);
 		mvprintw(getmaxy(stdscr)-1, 0, "%d/%d",exited,ippl);
