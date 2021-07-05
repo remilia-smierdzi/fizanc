@@ -43,6 +43,7 @@ unsigned int ncprop=0;
 unsigned int exited=0;
 struct point exits[ARRAY_SIZE];
 unsigned int cexits;
+unsigned int counter=0;
 
 int main(int argc,char *argv[]){
 	if (argc!=2){
