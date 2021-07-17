@@ -8,8 +8,7 @@
 #define WALL_VALUE 10000
 #define ARRAY_SIZE 1000
 #define PROPAGATION_SIZE 5000
-#define BETA 0
-/* beta=antisociality factor */
+
 struct point{
 	int x;
 	int y;
@@ -21,6 +20,9 @@ struct person{
 	struct point pos;
 	bool in;
 };
+
+float beta=.5;
+/* beta=antisociality factor */
 
 void propagate(int x,int y);
 void pmove(struct person *p);
@@ -45,23 +47,70 @@ unsigned int exited=0;
 struct point exits[ARRAY_SIZE];
 unsigned int cexits;
 unsigned int counter=0;
+bool skip = false;
+bool iniskip = false;
+char* filename = NULL;
 
 int main(int argc,char *argv[]){
-	if (argc!=2){
-		printf("usage: only arg is the filename of simulation template\n");
-		return 2;
+    if (argc<2){
+		printf("Floor field with pressure model\n"
+            "Usage\n"
+            "%s [options] <file>\n"
+            "Options:\n"
+            "\t<file>\t\t\tfile containing the simulation template\n"
+            "\t-s\t\t\t\tenable skip mode - don't draw\n"
+            "\t-b <0.0-1.0>\tbeta factor - antisociality, floating point number from 0 to 1 (default .5)\n\n"
+            "Template file format\n"
+            "can only contain characters:\n"
+            "\t#\t\tfor wall\n"
+            "\tp\t\tfor person\n"
+            "\te\t\tfor exit\n"
+            "\tspace\tfor air\n"
+            "The room containing the exits has to be completely closed, with sharp corners, example:\n"
+            "\t####\n"
+            "\t#p ##\n"
+            "\t#p e#\n"
+            "\t#####\n",argv[0]);
+		return 1;
 	}
 	
-	
-	initscr();
-	start_color();			/* Start color 			*/
-	init_pair(1, COLOR_GREEN, COLOR_BLACK);
-	init_pair(2, COLOR_RED, COLOR_BLACK);
-	
-	
-	
+    for (int i=1;i<argc;i++){
+        if(argv[i][0]=='-'){
+            switch (argv[i][1]){
+                case 's':
+                    skip=true;
+                    iniskip=true;
+                    break;
+                case 'b':
+                    beta = atof(argv[++i]);
+                    break;
+                default:
+                    printf("Usage\n"
+                        "%s [options] <file>\n"
+                        "Options:\n"
+                        "\t<file>\t\t\tfile containing the simulation template\n"
+                        "\t-s\t\t\t\tenable skip mode - don't draw\n"
+                        "\t-b <0.0-1.0>\tbeta factor - antisociality, floating point number from 0 to 1 (default .5)\n\n"
+                        "Template file format\n"
+                        "can only contain characters:\n"
+                        "\t#\t\tfor wall\n"
+                        "\tp\t\tfor person\n"
+                        "\te\t\tfor exit\n"
+                        "\tspace\tfor air\n"
+                        "The room containing the exits has to be completely closed, with sharp corners, example:\n"
+                        "\t####\n"
+                        "\t#p ##\n"
+                        "\t#p e#\n"
+                        "\t#####\n",argv[0]);
+		                return 1;
+            }
+        } else {
+            filename = argv[i];
+        }
+    }
+	if (filename==NULL) return 2;
 	FILE *f;
-	f = fopen(argv[1], "r");
+	f = fopen(filename, "r");
 	if (!f) return 1;
 	int c;
 	int cline=0,crow=0,mrow=0;
@@ -90,14 +139,14 @@ int main(int argc,char *argv[]){
 				cls[crow++][cline].value = 1;
 				break;
 			default:
-				printf("bad file format");
-				return 1;
+				printf("illegal character in file");
+				return 3;
 		}
 	}
 	fclose(f);
 	if(cprop<1){
-		printf("bad f format");
-		return 1;
+		printf("no exits in simulation template");
+		return 4;
 	}
 	for (int i=0;i<cprop;i++){
 		exits[i]=qprop[i];
@@ -108,9 +157,14 @@ int main(int argc,char *argv[]){
 	for (int i=0;i<ippl;i++){
 		ppl[i].in=true;
 	}
-	initscr();
-	noecho();
-	curs_set(0);
+    if (!skip){
+        initscr();
+        start_color();
+        init_pair(1, COLOR_GREEN, COLOR_BLACK);
+        init_pair(2, COLOR_RED, COLOR_BLACK);
+        noecho();
+        curs_set(0);
+    }
 	/* propagate floor field values */
 	while(cprop){
 		for (int i=0;i<cprop;i++){
@@ -161,34 +215,43 @@ int main(int argc,char *argv[]){
 		mvaddch(exits[i].y, exits[i].x,'e');
 		attroff(COLOR_PAIR(1));
 	}
-  mvprintw(getmaxy(stdscr)-3,0,"any key progresses the simulation once");
+
+  mvprintw(getmaxy(stdscr)-5,0,"floor field with pressure\n"
+  "antisociality beta=%f\n"
+  "any key progresses the simulation once",beta);
 	/* simulation loop */
 	while (true){
-		refresh();
+        if (!skip){
+            refresh();
+        }
 		if (exited==ippl) break;
-		getch();
+        if (!skip && ((c=getch())==EOF || c=='s')){
+            //skip the visual part of simulating
+            skip=true;
+        }
 		// usleep(250000);
 		pshuf();
-		/* move and draw people */
+        /* draw spaces over people */
+        for (int i=0;i<ippl;i++){
+			if(ppl[i].in){
+				mvaddch(ppl[i].pos.y,ppl[i].pos.x,' ');
+            }
+        }
+		/* move people */
 		for (int i=0;i<ippl;i++){
 			if(ppl[i].in){
-				attron(COLOR_PAIR(2));
-				mvaddch(ppl[i].pos.y,ppl[i].pos.x,' ');
-				attroff(COLOR_PAIR(2));
-        /* when people around */
-        if(paround(ppl[i].pos.x,ppl[i].pos.y)){
-          /* beta-based randomization here */
-				  if ((float)rand()/(float)RAND_MAX>BETA){
-					  pmove(&ppl[i]);
-				  }else{
-					  pmoveesc(&ppl[i]);
-				  }
-        /* when no people around */
-        } else {
-          pmove(&ppl[i]);
-        }		attron(COLOR_PAIR(2));
-				mvaddch(ppl[i].pos.y,ppl[i].pos.x,'p');
-				attroff(COLOR_PAIR(2));
+                /* when people around */
+                if(paround(ppl[i].pos.x,ppl[i].pos.y)){
+                    /* beta-based randomization here */
+				    if ((float)rand()/(float)RAND_MAX>beta){
+                        pmove(&ppl[i]);
+                    }else{
+                        pmoveesc(&ppl[i]);
+                    }
+                /* when no people around */
+                } else {
+                    pmove(&ppl[i]);
+                }
 			}
 		}
 		/* remove people standing on exits */
@@ -198,19 +261,41 @@ int main(int argc,char *argv[]){
 				ppl[i].in=FALSE;
 			}
 		}
-		/* redraw all exits */
-		for (int i=0;i<cexits;i++){
-			attron(COLOR_PAIR(1));
-			mvaddch(exits[i].y, exits[i].x,'e');
-			attroff(COLOR_PAIR(1));
-		}
-    mvprintw(getmaxy(stdscr)-2,0,"steps done:%d",++counter);
-		mvprintw(getmaxy(stdscr)-1, 0, "%d/%d",exited,ippl);
+
+        counter++;
+
+        if (!skip){
+            /* draw people */
+            attron(COLOR_PAIR(2));
+            for (int i=0;i<ippl;i++){
+                if(ppl[i].in){
+                    mvaddch(ppl[i].pos.y,ppl[i].pos.x,'p');
+                }
+            }
+            attroff(COLOR_PAIR(2));
+            /* redraw all exits */
+            for (int i=0;i<cexits;i++){
+                attron(COLOR_PAIR(1));
+                mvaddch(exits[i].y, exits[i].x,'e');
+                attroff(COLOR_PAIR(1));
+            }
+            mvprintw(getmaxy(stdscr)-2,0,"steps done:%d",counter);
+            mvprintw(getmaxy(stdscr)-1, 0, "%d/%d",exited,ippl);
+        }
 	}
-  mvprintw(getmaxy(stdscr)-3,0,"\n");
-  mvprintw(getmaxy(stdscr)-3,0,"press q to exit");
-  mvprintw(getmaxy(stdscr)-2,0,"simulation completed in %d",counter++);
-	while((c=getch())!='q');
+    if(!iniskip){
+        if (skip){
+            mvprintw(getmaxy(stdscr)-2,0,"steps done:%d",counter);
+            mvprintw(getmaxy(stdscr)-1, 0, "%d/%d",exited,ippl);
+        }
+        mvprintw(getmaxy(stdscr)-3,0,"\n");
+        mvprintw(getmaxy(stdscr)-3,0,"press q to exit");
+        mvprintw(getmaxy(stdscr)-2,0,"simulation completed in %d",counter);
+        refresh();
+        while((c=getch())!='q');
+    } else{
+        printf("%d\n",counter);
+    }
 	endwin();
 }
 
