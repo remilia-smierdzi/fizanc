@@ -218,7 +218,7 @@ int main(int argc,char *argv[]){
 
   mvprintw(getmaxy(stdscr)-5,0,"floor field with pressure\n"
   "antisociality beta=%f\n"
-  "any key progresses the simulation once",beta);
+  "any key progresses the simulation once, 's' skips to the results",beta);
 	/* simulation loop */
 	while (true){
         if (!skip){
