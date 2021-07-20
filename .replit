@@ -1,2 +1,2 @@
 language = "c"
-run = "make && echo running \\'./ffp lecture\\' && sleep 2 && ./ffp lecture && echo running \\'./ffrm lecture\\' && sleep 2 && ./ffrm lecture"
+run = "make && echo running ./ffp && ./ffp"
